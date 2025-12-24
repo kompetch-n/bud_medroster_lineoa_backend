@@ -113,16 +113,31 @@ async def webhook(request: Request):
             )
             continue
 
-        # -------------------------
-        # เช็คว่าผูก LINE แล้วหรือยัง
-        # -------------------------
-        already = doctor_collection.find_one({"line_id": userid_line})
-        if already:
-            send_line_message(
-                userid_line,
-                "⚠️ LINE นี้ถูกผูกกับแพทย์แล้ว\nพิมพ์ cancel หากต้องการแก้ไข"
-            )
-            continue
+            # -------------------------
+            # ถ้า LINE นี้อยู่ระหว่าง pending
+            # -------------------------
+            pending = doctor_collection.find_one({
+                "pending_line_id": userid_line
+            })
+            if pending:
+                send_line_message(
+                    userid_line,
+                    "ℹ️ กรุณายืนยันข้อมูลก่อน\nพิมพ์ confirm หรือ cancel"
+                )
+                continue
+
+            # -------------------------
+            # ถ้าผูกเสร็จแล้วจริง ๆ
+            # -------------------------
+            already = doctor_collection.find_one({
+                "line_id": userid_line
+            })
+            if already:
+                send_line_message(
+                    userid_line,
+                    "⚠️ LINE นี้ถูกผูกกับแพทย์แล้ว\nพิมพ์ cancel หากต้องการแก้ไข"
+                )
+                continue
 
         # -------------------------
         # STEP 1: กรอก care_provider_code
