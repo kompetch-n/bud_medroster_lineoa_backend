@@ -58,68 +58,43 @@ async def webhook(request: Request):
         return {"status": "ok"}
 
     for event in body.get("events", []):
-        userid_line = event.get("source", {}).get("userId")
-        message = event.get("message", {}).get("text", "").strip().lower()
+        source = event.get("source", {})
+        userid_line = source.get("userId")
+        message = event.get("message", {}).get("text", "").strip()
 
         if not userid_line or not message:
             continue
 
-        # -------------------------
-        # CANCEL
-        # -------------------------
-        if message == "cancel":
-            doctor_collection.update_many(
-                {"line_id": userid_line},
-                {"$unset": {"line_id": ""}}
-            )
-
-            send_line_message(
-                userid_line,
-                "🛑 ยกเลิกการผูก LINE แล้ว\nสามารถกรอกรหัสแพทย์ใหม่ได้"
-            )
-            continue
-
-        # -------------------------
-        # เช็คว่าผูก LINE ไปแล้วหรือยัง
-        # -------------------------
-        already = doctor_collection.find_one({"line_id": userid_line})
-        if already:
-            send_line_message(
-                userid_line,
-                "⚠️ LINE นี้ถูกผูกกับแพทย์แล้ว\nพิมพ์ cancel หากต้องการแก้ไข"
-            )
-            continue
-
-        # -------------------------
-        # ค้นแพทย์ด้วย care_provider_code
-        # -------------------------
+        # 🔍 ค้นแพทย์ด้วย care_provider_code
         doctor = doctor_collection.find_one({
             "care_provider_code": message
         })
 
+        # ❌ ไม่พบแพทย์
         if not doctor:
             send_line_message(
-                userid_line,
-                "❌ ไม่พบรหัสแพทย์\nกรุณากรอกใหม่ หรือพิมพ์ cancel"
+                to=userid_line,
+                message=(
+                    "❌ ไม่พบรหัสแพทย์ในระบบ\n\n"
+                    "กรุณาตรวจสอบ care_provider_code\n"
+                    "หรือ ติดต่อ Admin"
+                )
             )
             continue
 
-        # -------------------------
-        # ผูก LINE สำเร็จ
-        # -------------------------
+        # ✅ พบแพทย์ → update line_id
         doctor_collection.update_one(
             {"_id": doctor["_id"]},
             {"$set": {"line_id": userid_line}}
         )
 
         send_line_message(
-            userid_line,
-            (
+            to=userid_line,
+            message=(
                 "✅ ลงทะเบียน LINE สำเร็จ\n\n"
-                f"ชื่อ: {doctor.get('thai_full_name','-')}\n"
-                f"แผนก: {doctor.get('department','-')}"
+                f"ชื่อ: {doctor.get('thai_full_name', '-')}\n"
+                f"แผนก: {doctor.get('department', '-')}"
             )
         )
 
     return {"status": "ok"}
-
