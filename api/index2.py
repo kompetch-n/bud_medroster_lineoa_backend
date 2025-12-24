@@ -1,7 +1,6 @@
 import os
 import requests
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -14,17 +13,6 @@ LINE_API_URL = "https://api.line.me/v2/bot/message/push"
 LINE_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 
 app = FastAPI(title="LINE Messaging API Backend")
-
-# -------------------------
-# CORS
-# -------------------------
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],          # แนะนำให้เปลี่ยนเป็น domain จริงตอน production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # -------------------------
 # Pydantic Model
