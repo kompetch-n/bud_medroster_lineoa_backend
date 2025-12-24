@@ -1,6 +1,6 @@
 import os
 import requests
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -14,7 +14,7 @@ app = FastAPI(title="LINE Messaging API Backend")
 # -------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # ปรับเป็น domain จริงตอน production
+    allow_origins=["*"],   # แนะนำจำกัด domain จริงตอน production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,22 +38,51 @@ def send_line_message(to: str, message: str):
 
     payload = {
         "to": to,
-        "messages": [{"type": "text", "text": message}]
+        "messages": [
+            {"type": "text", "text": message}
+        ]
     }
 
-    response = requests.post(
+    requests.post(
         LINE_API_URL,
         headers=headers,
         json=payload,
         timeout=10
     )
 
-    return response.json()
+# -------------------------
+# Webhook รับข้อความ + userid_line
+# -------------------------
+@app.post("/webhook")
+async def webhook(request: Request):
+    body = await request.json()
+
+    for event in body.get("events", []):
+        source = event.get("source", {})
+        userid_line = source.get("userId")
+        message = event.get("message", {}).get("text", "")
+
+        if userid_line:
+            print("📌 userid_line:", userid_line)
+            print("💬 message:", message)
+
+            # ตัวอย่างตอบกลับเพื่อยืนยัน
+            send_line_message(
+                to=userid_line,
+                message=f"รับ userId แล้ว ✅\n{userid_line}"
+            )
+
+            # 👉 ตรงนี้คุณสามารถ:
+            # - บันทึก userid_line ลง DB
+            # - ผูกกับแพทย์ / พนักงาน
+            # - แยกคำสั่ง /register
+
+    return {"status": "ok"}
 
 # -------------------------
-# Endpoint
+# Manual send (ทดสอบจาก frontend / admin)
 # -------------------------
 @app.post("/send-line")
 def send_line(data: LineMessageRequest):
-    result = send_line_message(data.to, data.message)
-    return {"status": "success", "line_response": result}
+    send_line_message(data.to, data.message)
+    return {"status": "success"}
