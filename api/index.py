@@ -3,12 +3,6 @@ import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
-
-# -------------------------
-# Load environment
-# -------------------------
-load_dotenv()
 
 LINE_API_URL = "https://api.line.me/v2/bot/message/push"
 LINE_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
@@ -20,21 +14,21 @@ app = FastAPI(title="LINE Messaging API Backend")
 # -------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # แนะนำให้เปลี่ยนเป็น domain จริงตอน production
+    allow_origins=["*"],   # ปรับเป็น domain จริงตอน production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # -------------------------
-# Pydantic Model
+# Model
 # -------------------------
 class LineMessageRequest(BaseModel):
-    to: str        # userId หรือ groupId
-    message: str   # ข้อความที่ต้องการส่ง
+    to: str
+    message: str
 
 # -------------------------
-# LINE Send Function
+# Send LINE
 # -------------------------
 def send_line_message(to: str, message: str):
     headers = {
@@ -44,12 +38,7 @@ def send_line_message(to: str, message: str):
 
     payload = {
         "to": to,
-        "messages": [
-            {
-                "type": "text",
-                "text": message
-            }
-        ]
+        "messages": [{"type": "text", "text": message}]
     }
 
     response = requests.post(
@@ -62,16 +51,9 @@ def send_line_message(to: str, message: str):
     return response.json()
 
 # -------------------------
-# FastAPI Endpoint
+# Endpoint
 # -------------------------
 @app.post("/send-line")
 def send_line(data: LineMessageRequest):
-    result = send_line_message(
-        to=data.to,
-        message=data.message
-    )
-
-    return {
-        "status": "success",
-        "line_response": result
-    }
+    result = send_line_message(data.to, data.message)
+    return {"status": "success", "line_response": result}
