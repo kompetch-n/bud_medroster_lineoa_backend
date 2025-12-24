@@ -103,18 +103,11 @@ async def webhook(request: Request):
                 }
             )
 
-            thai_title = doctor.get("thai_title", "")
-            full_name = doctor.get("thai_full_name", "-")
-            specialties = doctor.get("specialties", [])
-
-            specialties_text = ", ".join(specialties) if isinstance(specialties, list) else specialties
-
             send_line_message(
                 userid_line,
                 (
                     "✅ ลงทะเบียน LINE สำเร็จ\n\n"
-                    f"ชื่อ: {thai_title}{full_name}\n"
-                    f"สาขาเฉพาะทาง: {specialties_text or '-'}\n"
+                    f"ชื่อ: {doctor.get('thai_full_name','-')}\n"
                     f"แผนก: {doctor.get('department','-')}"
                 )
             )
@@ -170,18 +163,11 @@ async def webhook(request: Request):
             }
         )
 
-        thai_title = doctor.get("thai_title", "")
-        full_name = doctor.get("thai_full_name", "-")
-        specialties = doctor.get("specialties", [])
-
-        specialties_text = ", ".join(specialties) if isinstance(specialties, list) else specialties
-
         send_line_message(
             userid_line,
             (
                 "🔍 กรุณายืนยันตัวตน\n\n"
-                f"ชื่อ: {thai_title}{full_name}\n"
-                f"สาขาเฉพาะทาง: {specialties_text or '-'}\n"
+                f"ชื่อ: {doctor.get('thai_full_name','-')}\n"
                 f"แผนก: {doctor.get('department','-')}\n\n"
                 "พิมพ์ confirm เพื่อยืนยัน\n"
                 "หรือพิมพ์ cancel เพื่อยกเลิก"
