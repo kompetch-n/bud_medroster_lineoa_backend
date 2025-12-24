@@ -58,44 +58,105 @@ async def webhook(request: Request):
         return {"status": "ok"}
 
     for event in body.get("events", []):
-        source = event.get("source", {})
-        userid_line = source.get("userId")
-        message = event.get("message", {}).get("text", "").strip()
+        userid_line = event.get("source", {}).get("userId")
+        message = event.get("message", {}).get("text", "").strip().lower()
 
         if not userid_line or not message:
             continue
 
-        # 🔍 ค้นแพทย์ด้วย care_provider_code
-        doctor = doctor_collection.find_one({
-            "care_provider_code": message
-        })
+        # -------------------------
+        # CANCEL
+        # -------------------------
+        if message == "cancel":
+            doctor_collection.update_many(
+                {"pending_line_id": userid_line},
+                {"$unset": {"pending_line_id": "", "pending_at": ""}}
+            )
 
-        # ❌ ไม่พบแพทย์
-        if not doctor:
             send_line_message(
-                to=userid_line,
-                message=(
-                    "❌ ไม่พบรหัสแพทย์ในระบบ\n\n"
-                    "กรุณาตรวจสอบ care_provider_code\n"
-                    "หรือ ติดต่อ Admin"
+                userid_line,
+                "🛑 ยกเลิกการลงทะเบียนแล้ว\nสามารถกรอกรหัสแพทย์ใหม่ได้"
+            )
+            continue
+
+        # -------------------------
+        # CONFIRM
+        # -------------------------
+        if message == "confirm":
+            doctor = doctor_collection.find_one({
+                "pending_line_id": userid_line
+            })
+
+            if not doctor:
+                send_line_message(
+                    userid_line,
+                    "⚠️ ไม่พบรายการที่ต้องยืนยัน\nกรุณากรอกรหัสแพทย์ใหม่"
+                )
+                continue
+
+            # ผูก LINE จริง
+            doctor_collection.update_one(
+                {"_id": doctor["_id"]},
+                {
+                    "$set": {"line_id": userid_line},
+                    "$unset": {"pending_line_id": "", "pending_at": ""}
+                }
+            )
+
+            send_line_message(
+                userid_line,
+                (
+                    "✅ ลงทะเบียน LINE สำเร็จ\n\n"
+                    f"ชื่อ: {doctor.get('thai_full_name','-')}\n"
+                    f"แผนก: {doctor.get('department','-')}"
                 )
             )
             continue
 
-        # ✅ พบแพทย์ → update line_id
+        # -------------------------
+        # เช็คว่าผูก LINE แล้วหรือยัง
+        # -------------------------
+        already = doctor_collection.find_one({"line_id": userid_line})
+        if already:
+            send_line_message(
+                userid_line,
+                "⚠️ LINE นี้ถูกผูกกับแพทย์แล้ว\nพิมพ์ cancel หากต้องการแก้ไข"
+            )
+            continue
+
+        # -------------------------
+        # STEP 1: กรอก care_provider_code
+        # -------------------------
+        doctor = doctor_collection.find_one({
+            "care_provider_code": message
+        })
+
+        if not doctor:
+            send_line_message(
+                userid_line,
+                "❌ ไม่พบรหัสแพทย์\nกรุณากรอกใหม่ หรือพิมพ์ cancel"
+            )
+            continue
+
+        # บันทึก pending
         doctor_collection.update_one(
             {"_id": doctor["_id"]},
-            {"$set": {"line_id": userid_line}}
+            {
+                "$set": {
+                    "pending_line_id": userid_line
+                }
+            }
         )
 
         send_line_message(
-            to=userid_line,
-            message=(
-                "✅ ลงทะเบียน LINE สำเร็จ\n\n"
-                f"ชื่อ: {doctor.get('thai_full_name', '-')}\n"
-                f"แผนก: {doctor.get('department', '-')}"
+            userid_line,
+            (
+                "🔍 กรุณายืนยันตัวตน\n\n"
+                f"ชื่อ: {doctor.get('thai_full_name','-')}\n"
+                f"แผนก: {doctor.get('department','-')}\n\n"
+                "พิมพ์ confirm เพื่อยืนยัน\n"
+                "หรือพิมพ์ cancel เพื่อยกเลิก"
             )
         )
 
     return {"status": "ok"}
-
