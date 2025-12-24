@@ -3,6 +3,7 @@ import requests
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
+from pydantic import BaseModel
 
 LINE_API_URL = "https://api.line.me/v2/bot/message/push"
 LINE_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
@@ -32,6 +33,13 @@ app.add_middleware(
 )
 
 # -------------------------
+# Model
+# -------------------------
+class LineMessageRequest(BaseModel):
+    to: str
+    message: str
+
+# -------------------------
 # Send LINE
 # -------------------------
 def send_line_message(to: str, message: str):
@@ -46,6 +54,14 @@ def send_line_message(to: str, message: str):
     }
 
     requests.post(LINE_API_URL, headers=headers, json=payload, timeout=10)
+
+# -------------------------
+# Endpoint
+# -------------------------
+@app.post("/send-line")
+def send_line(data: LineMessageRequest):
+    result = send_line_message(data.to, data.message)
+    return {"status": "success", "line_response": result}
 
 # -------------------------
 # Webhook
