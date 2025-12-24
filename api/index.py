@@ -14,7 +14,7 @@ app = FastAPI(title="LINE Messaging API Backend")
 # -------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # แนะนำจำกัด domain จริงตอน production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,24 +38,21 @@ def send_line_message(to: str, message: str):
 
     payload = {
         "to": to,
-        "messages": [
-            {"type": "text", "text": message}
-        ]
+        "messages": [{"type": "text", "text": message}]
     }
 
-    requests.post(
-        LINE_API_URL,
-        headers=headers,
-        json=payload,
-        timeout=10
-    )
+    requests.post(LINE_API_URL, headers=headers, json=payload, timeout=10)
 
 # -------------------------
-# Webhook รับข้อความ + userid_line
+# Webhook (รองรับ Verify + รับข้อความจริง)
 # -------------------------
 @app.post("/webhook")
 async def webhook(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        # 👉 LINE Verify จะเข้ามาตรงนี้
+        return {"status": "ok"}
 
     for event in body.get("events", []):
         source = event.get("source", {})
@@ -66,21 +63,15 @@ async def webhook(request: Request):
             print("📌 userid_line:", userid_line)
             print("💬 message:", message)
 
-            # ตัวอย่างตอบกลับเพื่อยืนยัน
             send_line_message(
                 to=userid_line,
                 message=f"รับ userId แล้ว ✅\n{userid_line}"
             )
 
-            # 👉 ตรงนี้คุณสามารถ:
-            # - บันทึก userid_line ลง DB
-            # - ผูกกับแพทย์ / พนักงาน
-            # - แยกคำสั่ง /register
-
     return {"status": "ok"}
 
 # -------------------------
-# Manual send (ทดสอบจาก frontend / admin)
+# Manual send
 # -------------------------
 @app.post("/send-line")
 def send_line(data: LineMessageRequest):
