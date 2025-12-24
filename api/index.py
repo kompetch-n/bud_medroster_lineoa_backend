@@ -82,7 +82,9 @@ async def webhook(request: Request):
         # -------------------------
         # เช็คว่าผูก LINE ไปแล้วหรือยัง
         # -------------------------
-        already = doctor_collection.find_one({"line_id": userid_line})
+        already = doctor_collection.find_one({
+            "line_id": {"$exists": True, "$eq": userid_line}
+        })
         if already:
             send_line_message(
                 userid_line,
