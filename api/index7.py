@@ -5,9 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from pydantic import BaseModel
 
-# from dotenv import load_dotenv
-# load_dotenv()
-
 LINE_API_URL = "https://api.line.me/v2/bot/message/push"
 LINE_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 
@@ -53,22 +50,10 @@ def send_line_message(to: str, message: str):
 
     payload = {
         "to": to,
-        "messages": [
-            {"type": "text", "text": message}
-        ]
+        "messages": [{"type": "text", "text": message}]
     }
 
-    response = requests.post(
-        LINE_API_URL,
-        headers=headers,
-        json=payload,
-        timeout=10
-    )
-
-    return {
-        "status_code": response.status_code,
-        "response": response.json() if response.content else None
-    }
+    requests.post(LINE_API_URL, headers=headers, json=payload, timeout=10)
 
 # -------------------------
 # Endpoint
@@ -76,10 +61,7 @@ def send_line_message(to: str, message: str):
 @app.post("/send-line")
 def send_line(data: LineMessageRequest):
     result = send_line_message(data.to, data.message)
-    return {
-        "status": "success",
-        "line_response": result
-    }
+    return {"status": "success", "line_response": result}
 
 # -------------------------
 # Webhook
@@ -99,9 +81,9 @@ async def webhook(request: Request):
             continue
 
         # -------------------------
-        # CANCEL (พิมพ์ 2)
+        # CANCEL
         # -------------------------
-        if message == "2":
+        if message == "cancel":
             doctor_collection.update_many(
                 {"pending_line_id": userid_line},
                 {"$unset": {"pending_line_id": "", "pending_at": ""}}
@@ -114,9 +96,9 @@ async def webhook(request: Request):
             continue
 
         # -------------------------
-        # CONFIRM (พิมพ์ 1)
+        # CONFIRM
         # -------------------------
-        if message == "1":
+        if message == "confirm":
             doctor = doctor_collection.find_one({
                 "pending_line_id": userid_line
             })
@@ -140,6 +122,7 @@ async def webhook(request: Request):
             thai_title = doctor.get("thai_title", "")
             full_name = doctor.get("thai_full_name", "-")
             specialties = doctor.get("specialties", [])
+
             specialties_text = ", ".join(specialties) if isinstance(specialties, list) else specialties
 
             send_line_message(
@@ -162,7 +145,7 @@ async def webhook(request: Request):
             if pending:
                 send_line_message(
                     userid_line,
-                    "ℹ️ กรุณายืนยันข้อมูลก่อน\nพิมพ์ 1 เพื่อยืนยัน หรือ 2 เพื่อยกเลิก"
+                    "ℹ️ กรุณายืนยันข้อมูลก่อน\nพิมพ์ confirm หรือ cancel"
                 )
                 continue
 
@@ -189,7 +172,7 @@ async def webhook(request: Request):
         if not doctor:
             send_line_message(
                 userid_line,
-                "❌ ไม่พบรหัสแพทย์\nกรุณากรอกใหม่"
+                "❌ ไม่พบรหัสแพทย์\nกรุณากรอกใหม่ หรือพิมพ์ cancel"
             )
             continue
 
@@ -216,8 +199,8 @@ async def webhook(request: Request):
                 f"ชื่อ: {thai_title}{full_name}\n"
                 f"สาขาเฉพาะทาง: {specialties_text or '-'}\n"
                 f"แผนก: {doctor.get('department','-')}\n\n"
-                "พิมพ์ 1 เพื่อยืนยัน\n"
-                "พิมพ์ 2 เพื่อยกเลิก"
+                "พิมพ์ confirm เพื่อยืนยัน\n"
+                "หรือพิมพ์ cancel เพื่อยกเลิก"
             )
         )
 
